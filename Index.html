@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>UFO의 행성 탈출</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=800, initial-scale=1.0, user-scalable=no" />
   <style>
     html, body {
       padding: 0; margin: 0; width: 100%; height: 100%; background: #1a0c0d;
@@ -22,14 +22,11 @@
       image-rendering: pixelated;
       box-shadow: 0 0 48px #8e2628, 0 0 8px #ae5b60 inset;
       border-radius: 18px;
-      position: relative;
-      z-index: 1;
     }
     .credit {
       position: fixed; bottom: 10px; left: 0; width: 100%; color: #b48c77; font-size: 13px; text-align: center; opacity: 0.6; letter-spacing: 1px;
       pointer-events: none;
     }
-    /* 부스터 UI */
     #boosterBtn {
       position: fixed;
       left: 22px;
@@ -37,7 +34,7 @@
       width: 90px;
       height: 90px;
       z-index: 10;
-      display: none; /* 모바일에서만 보임 */
+      display: none;
       background: none;
       border: none;
       padding: 0;
@@ -60,7 +57,6 @@
       text-shadow: 1px 2px 0 #193d7b, 0 0 10px #9fdaff;
       user-select: none;
     }
-    /* 조작법 텍스트 */
     #controlGuide {
       position: absolute;
       left: 24px; top: 20px; z-index: 12;
@@ -90,28 +86,21 @@
 </head>
 <body>
 <canvas id="gameCanvas" width="800" height="400" tabindex="0"></canvas>
-
-<!-- 모바일 부스터 UI 버튼 -->
 <button id="boosterBtn" type="button" tabindex="-1">
   <canvas width="90" height="90"></canvas>
   <span>BOOST</span>
 </button>
-
-<!-- 좌측 상단 조작법 -->
 <div id="controlGuide"></div>
-
 <div class="credit">UFO의 행성 탈출 - <a href="https://github.com/" target="_blank" style="color:#f5d487;text-decoration:none">by YourName</a></div>
-
 <script>
-// 모바일 판별(간단 버전)
 function isMobile() {
   return /Android|iPhone|iPad|iPod|Mobile|Touch/i.test(navigator.userAgent);
 }
-
-// ========== [1. 게임 상수 및 변수 선언] ==========
+// =====================
+// 기본 상수/변수 선언
 const CANVAS_W = 800, CANVAS_H = 400;
 const GROUND_Y = 330;
-const UFO_X = 140;
+const UFO_X = 140; // 고정 x 좌표
 const FPS = 60;
 const GRAVITY = 0.58;
 const JUMP_VELOCITY = -10.5;
@@ -122,59 +111,23 @@ const PARTICLE_COUNT = 15;
 const BOOSTER_PARTICLE_COUNT = 28;
 const UFO_ROTATE_SPEED = 0.35;
 const STAGE_SCENE = { 0: 1.0, 60: 1.0, 120: 1.2, 180: 1.5, 240: 2.0 };
-
 let canvas = document.getElementById('gameCanvas');
 let ctx = canvas.getContext('2d');
-
-// ========== [2. 유틸 함수들] ==========
-function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
-function rand(a, b) { return Math.random() * (b - a) + a; }
-function randInt(a, b) { return Math.floor(rand(a, b+1)); }
-function now() { return performance.now(); }
-
-// ========== [3. 게임 상태 객체 선언] ==========
 let game = {
-  state: 'ready',
-  startTime: 0,
-  elapsed: 0,
-  lastFrame: 0,
-  bgOffset: 0,
-  bgSpeed: 4,
-  booster: false,
-  boosterParticle: [],
-  shake: 0,
-  showClearFx: false,
+  state: 'ready', startTime: 0, elapsed: 0, lastFrame: 0,
+  bgOffset: 0, bgSpeed: 4, booster: false, boosterParticle: [],
+  shake: 0, showClearFx: false,
 };
-
-// ========== [4. UFO(플레이어) 객체 선언] ==========
 let ufo = {
-  y: GROUND_Y - UFO_RADIUS,
-  vy: 0,
-  jumpCount: 0,
-  onGround: true,
-  rot: 0,
-  particle: [],
-  clearFx: false,
-  clearFrame: 0,
-  clearParticle: [],
+  y: GROUND_Y - UFO_RADIUS, vy: 0, jumpCount: 0, onGround: true,
+  rot: 0, particle: [], clearFx: false, clearFrame: 0, clearParticle: [],
+  clearX: UFO_X, // 클리어 연출용 별도 위치
 };
-
-// ========== [5. 장애물(몬스터) 배열] ==========
 let monsters = [];
-
-// ========== [6. 입력 상태] ==========
 let input = {
-  jump: false,
-  doubleJump: false,
-  booster: false,
-  tapCount: 0,
-  lastTap: 0,
-  boosterTouch: false // 모바일 부스터 ui용
+  jump: false, doubleJump: false, booster: false, tapCount: 0, lastTap: 0, boosterTouch: false
 };
-
 const boosterBtn = document.getElementById('boosterBtn');
-
-// ========== [7. 주요 이벤트 리스너] ==========
 document.addEventListener('keydown', function(e) {
   if (e.repeat) return;
   if (['Space', 'ArrowUp', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -193,7 +146,6 @@ canvas.addEventListener('touchstart', function(e) {
   if (input.tapCount === 2) handleJump(true);
   else handleJump();
 }, {passive: false});
-
 function handleJump(forceDouble = false) {
   if (game.state === 'ready' || game.state === 'over') { restartGame(); return; }
   if (game.state === 'clear') return;
@@ -209,12 +161,10 @@ function handleJump(forceDouble = false) {
     createUfoJumpParticle(true);
   }
 }
-
-// ========== [8. 게임 초기화 및 재시작] ==========
 function restartGame() {
   game.state = 'playing';
-  game.startTime = now();
-  game.lastFrame = now();
+  game.startTime = performance.now();
+  game.lastFrame = performance.now();
   game.elapsed = 0;
   game.bgOffset = 0;
   game.bgSpeed = 4;
@@ -231,20 +181,17 @@ function restartGame() {
   ufo.clearFx = false;
   ufo.clearFrame = 0;
   ufo.clearParticle = [];
+  ufo.clearX = UFO_X;
 }
-
-// ========== [9. 메인 루프 (requestAnimationFrame)] ==========
 function mainLoop() {
   requestAnimationFrame(mainLoop);
-  let t = now();
+  let t = performance.now();
   let dt = (t - game.lastFrame) / (1000 / FPS);
-  dt = clamp(dt, 0.5, 1.5);
+  dt = Math.max(0.5, Math.min(dt, 1.5));
   game.lastFrame = t;
-
-  // 모바일 부스터 버튼 터치시 booster 적용
+  // 모바일 부스터 버튼
   if (input.boosterTouch) input.booster = true;
   else if (!input.booster) input.booster = false;
-
   if (game.state === 'playing') {
     game.elapsed = Math.floor((t - game.startTime) / 1000);
     updateStageParams();
@@ -270,60 +217,43 @@ function mainLoop() {
   if (game.shake < 0) game.shake = 0;
   render();
 }
-
-// ========== [10. 스테이지별 난이도, 속도 조정 함수] ==========
 function updateStageParams() {
-  let s = game.elapsed;
-  let nStage = 0;
-  for (let k of Object.keys(STAGE_SCENE)) {
-    if (s >= parseInt(k)) nStage = parseInt(k);
-  }
+  let s = game.elapsed, nStage = 0;
+  for (let k of Object.keys(STAGE_SCENE)) if (s >= parseInt(k)) nStage = parseInt(k);
   game.bgSpeed = 4 * STAGE_SCENE[nStage];
 }
-
-// ========== [11. UFO 점프 파티클 함수] ==========
 function createUfoJumpParticle(double=false) {
   for (let i=0; i<(double? PARTICLE_COUNT+4 : PARTICLE_COUNT); i++) {
-    let angle = rand(Math.PI, 2*Math.PI);
-    let speed = rand(2, 4.7) * (double?1.25:1.0);
+    let angle = Math.random() * Math.PI + Math.PI;
+    let speed = (Math.random()*2.7+2) * (double?1.25:1.0);
     ufo.particle.push({
       x: UFO_X, y: ufo.y+UFO_RADIUS-4,
       vx: Math.cos(angle)*speed,
       vy: Math.sin(angle)*speed*0.82,
-      life: rand(13,22)
+      life: Math.random()*9+13
     });
   }
 }
-
-// ========== [12. 부스터 파티클(바람선) 연출] ==========
 function updateBoosterParticles(dt) {
   for (let i=0; i<3; i++) {
     game.boosterParticle.push({
-      x: UFO_X - randInt(28,48),
-      y: ufo.y + randInt(-10,16),
-      vx: -rand(2,5),
-      vy: rand(-0.4,0.4),
-      life: rand(7,14)
+      x: UFO_X - Math.floor(Math.random()*20+28),
+      y: ufo.y + Math.floor(Math.random()*26-10),
+      vx: -Math.random()*3-2,
+      vy: Math.random()-0.5,
+      life: Math.random()*7+7
     });
   }
   game.boosterParticle = game.boosterParticle.filter(p=>p.life>0);
 }
-
-// ========== [13. 파티클/이펙트 업데이트] ==========
 function updateParticles() {
-  ufo.particle.forEach(p=>{
-    p.x += p.vx; p.y += p.vy; p.life -= 1;
-  });
+  ufo.particle.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.life--; });
   ufo.particle = ufo.particle.filter(p=>p.life>0);
-  game.boosterParticle.forEach(p=>{
-    p.x += p.vx; p.y += p.vy; p.life -= 1;
-  });
+  game.boosterParticle.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.life--; });
   game.boosterParticle = game.boosterParticle.filter(p=>p.life>0);
 }
-
-// ========== [14. 몬스터(장애물) 생성 및 업데이트] ==========
 function updateMonsters(bgSpd, dt) {
-  if (monsters.length === 0 || monsters[monsters.length-1].x < CANVAS_W - rand(180, 320)) {
+  if (monsters.length === 0 || monsters[monsters.length-1].x < CANVAS_W - Math.floor(Math.random()*140+180)) {
     let t = game.elapsed;
     let big = false;
     if (t < 60) big = false;
@@ -342,22 +272,21 @@ function updateMonsters(bgSpd, dt) {
   }
   monsters = monsters.filter(m=>!m.dead);
 }
-
 function createMonster(big) {
   return {
-    x: CANVAS_W + rand(0, 30),
+    x: CANVAS_W + Math.random()*30,
     y: big ? (GROUND_Y - 70) : (GROUND_Y - 38),
     w: big ? 42 : 24,
     h: big ? 70 : 38,
     big: big,
     mouth: 0,
     passed: false,
-    anim: rand(0,99)
+    anim: Math.random()*99
   };
 }
 function checkCollision(cx, cy, r, m) {
-  let closestX = clamp(cx, m.x, m.x + m.w);
-  let closestY = clamp(cy, m.y, m.y + m.h);
+  let closestX = Math.max(m.x, Math.min(cx, m.x + m.w));
+  let closestY = Math.max(m.y, Math.min(cy, m.y + m.h));
   let dx = cx - closestX, dy = cy - closestY;
   return (dx*dx + dy*dy) < r*r;
 }
@@ -371,41 +300,43 @@ function startClearFx() {
   ufo.clearFx = true;
   ufo.clearFrame = 0;
   ufo.clearParticle = [];
+  ufo.clearX = UFO_X;
 }
 function updateClearFx(dt) {
   ufo.clearFrame++;
   ufo.y -= 5.8 * dt;
-  UFO_X += 3.2 * dt;
+  ufo.clearX += 3.2 * dt;
   for (let i=0; i<2; i++) {
     ufo.clearParticle.push({
-      x: UFO_X+randInt(-8,8),
-      y: ufo.y+UFO_RADIUS-4+randInt(2,8),
-      vx: rand(-1,1),
-      vy: rand(2,4),
-      life: rand(12,22)
+      x: ufo.clearX+Math.floor(Math.random()*16-8),
+      y: ufo.y+UFO_RADIUS-4+Math.floor(Math.random()*6+2),
+      vx: Math.random()*2-1,
+      vy: Math.random()*2+2,
+      life: Math.random()*10+12
     });
   }
-  ufo.clearParticle.forEach(p=>{
-    p.x += p.vx; p.y += p.vy; p.life -= 1;
-  });
+  ufo.clearParticle.forEach(p=>{p.x+=p.vx; p.y+=p.vy; p.life--;});
   ufo.clearParticle = ufo.clearParticle.filter(p=>p.life>0);
-  if (ufo.y < -UFO_RADIUS-40 || UFO_X > CANVAS_W+60) {
+  if (ufo.y < -UFO_RADIUS-40 || ufo.clearX > CANVAS_W+60) {
     game.showClearFx = true;
     ufo.clearFx = false;
   }
 }
-
-// ========== [19. 캔버스 렌더링 함수] ==========
+// ===================== 렌더링
 function render() {
-  let shakeX = game.shake>0?randInt(-game.shake,game.shake):0;
-  let shakeY = game.shake>0?randInt(-game.shake,game.shake):0;
+  let shakeX = game.shake>0?Math.floor(Math.random()*game.shake*2-game.shake):0;
+  let shakeY = game.shake>0?Math.floor(Math.random()*game.shake*2-game.shake):0;
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
   ctx.save();
   ctx.translate(shakeX, shakeY);
   drawBackground(game.bgOffset);
   drawParticles(ufo.particle, 'rgba(240,240,100,0.70)', 3);
-  drawUFO();
+  if (game.state === 'clear' && ufo.clearFx) {
+    drawUFO(ufo.clearX, ufo.y, ufo.rot);
+  } else {
+    drawUFO(UFO_X, ufo.y, ufo.rot);
+  }
   if (input.booster) drawBooster();
   if (game.state==='clear') drawParticles(ufo.clearParticle, 'rgba(252,80,24,0.8)', 4);
   monsters.forEach(drawMonster);
@@ -413,8 +344,6 @@ function render() {
   drawUI();
   drawStateMsg();
 }
-
-// ========== [20. 배경/지형 그리기] ==========
 function drawBackground(offset) {
   let grad = ctx.createLinearGradient(0,0,0,CANVAS_H);
   grad.addColorStop(0,'#592d2d');
@@ -457,12 +386,10 @@ function drawBackground(offset) {
   }
   ctx.restore();
 }
-
-// ========== [21. UFO(플레이어) 픽셀 아트 그리기] ==========
-function drawUFO() {
+function drawUFO(x, y, rot) {
   ctx.save();
-  ctx.translate(UFO_X, ufo.y);
-  if (ufo.jumpCount === 2 || ufo.rot > 0.01) ctx.rotate(ufo.rot);
+  ctx.translate(x, y);
+  if (rot) ctx.rotate(rot);
   ctx.beginPath();
   ctx.ellipse(0, 13, UFO_RADIUS-2, 13, 0, Math.PI, 2*Math.PI);
   ctx.fillStyle = '#4e4a62';
@@ -492,8 +419,6 @@ function drawUFO() {
   }
   ctx.restore();
 }
-
-// ========== [22. 파티클 그리기(점프, 클리어)] ==========
 function drawParticles(arr, color, size) {
   ctx.save();
   for (let p of arr) {
@@ -506,22 +431,18 @@ function drawParticles(arr, color, size) {
   ctx.globalAlpha = 1.0;
   ctx.restore();
 }
-
-// ========== [23. 부스터 이펙트(카툰 바람선)] ==========
 function drawBooster() {
   ctx.save();
   for (let p of game.boosterParticle) {
     ctx.strokeStyle = 'rgba(180,220,255,0.7)';
-    ctx.lineWidth = rand(2.5,4.2);
+    ctx.lineWidth = Math.random()*1.7+2.5;
     ctx.beginPath();
-    ctx.moveTo(p.x+rand(-1,1), p.y+rand(-2,2));
-    ctx.lineTo(p.x-7+rand(-2,2), p.y+rand(-4,4));
+    ctx.moveTo(p.x+Math.random()*2-1, p.y+Math.random()*4-2);
+    ctx.lineTo(p.x-7+Math.random()*4-2, p.y+Math.random()*8-4);
     ctx.stroke();
   }
   ctx.restore();
 }
-
-// ========== [24. 몬스터(외계 식물) 픽셀 아트 그리기] ==========
 function drawMonster(m) {
   ctx.save();
   ctx.translate(m.x, m.y);
@@ -560,8 +481,6 @@ function drawMonster(m) {
   ctx.fill();
   ctx.restore();
 }
-
-// ========== [25. UI 및 메시지 그리기] ==========
 function drawUI() {
   ctx.save();
   ctx.font = '15px "Press Start 2P", monospace';
@@ -574,7 +493,6 @@ function drawUI() {
   }
   ctx.restore();
 }
-
 function drawStateMsg() {
   ctx.save();
   ctx.font = '28px "Press Start 2P", monospace';
@@ -601,13 +519,11 @@ function drawStateMsg() {
   }
   ctx.restore();
 }
-
-// ========== [26. 모바일 부스터 UI 구현] ==========
+// ========== 모바일 부스터 UI ================
 function drawBoosterBtnCanvas(ctx2, pressed) {
   ctx2.clearRect(0,0,90,90);
   ctx2.save();
   ctx2.translate(45,55);
-  // 외곽선/테두리
   ctx2.beginPath();
   ctx2.arc(0,0,38,0,2*Math.PI);
   ctx2.fillStyle = pressed ? "#ffe57e" : "#36bbf0";
@@ -620,7 +536,6 @@ function drawBoosterBtnCanvas(ctx2, pressed) {
   ctx2.lineWidth = 4;
   ctx2.strokeStyle = "#193d7b";
   ctx2.stroke();
-  // 번개 심볼
   ctx2.save();
   ctx2.translate(0,8);
   ctx2.rotate(-0.22);
@@ -645,7 +560,6 @@ if(isMobile()) {
   boosterBtn.style.display = '';
   let btnCv = boosterBtn.querySelector('canvas');
   drawBoosterBtnCanvas(btnCv.getContext('2d'), false);
-
   function boosterPress(ev) {
     input.boosterTouch = true;
     drawBoosterBtnCanvas(btnCv.getContext('2d'), true);
@@ -663,8 +577,7 @@ if(isMobile()) {
 } else {
   boosterBtn.style.display = 'none';
 }
-
-// ========== [27. 조작법 텍스트 안내] ==========
+// ========== 조작법 안내 ==============
 const controlGuide = document.getElementById('controlGuide');
 function updateGuideText() {
   if(isMobile()) {
@@ -675,8 +588,7 @@ function updateGuideText() {
 }
 updateGuideText();
 window.addEventListener('resize', updateGuideText);
-
-// PC 더블스페이스(2단점프)
+// 더블스페이스 2단점프
 let lastJump = 0;
 function handleJumpKey(){
   let nowT = Date.now();
@@ -691,8 +603,7 @@ document.addEventListener('keydown', function(e) {
 canvas.addEventListener('touchstart', function(e) {
   if (game.state === 'ready' || game.state === 'over') { handleJump(); }
 }, {passive:false});
-
-// 화면 크기 자동 조정 (반응형)
+// 반응형 캔버스
 function resizeCanvas() {
   let r = Math.min(window.innerWidth/800, window.innerHeight/420, 1);
   canvas.style.width = (800*r)+"px";
@@ -700,7 +611,7 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
-
+// ==================
 function init() {
   restartGame();
   game.state = 'ready';
